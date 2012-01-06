@@ -1,42 +1,29 @@
 #!/usr/bin/env python
 
 import os
-import sys
 import sqlite3
 from collections import defaultdict
+from getpass import getpass
+from datetime import datetime
+import time
 
-from mako.template import Template
-
-here = os.path.dirname(__file__)
+from pydelicious  import DeliciousAPI
 
 class Bookmark(object):
     def __init__(self, name, url, add_date, private=False, tags=[],
                  description=''):
         self.name = name
         self.url = url
-        self.add_date = add_date
+        self.add_date = datetime.fromtimestamp(add_date)
         self.private = private
         self.tags = [tags]
         self.description = description
-
-def xmlescape(s):
-    buf = []
-    for c in s:
-        o = ord(c)
-        if o > 127:
-            buf.append('&#x%x;' % o)
-        else:
-            buf.append(c)
-    return ''.join(buf)
-
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('db', help="The ybookmarks.sqlite file in firefox "
                         "profile directory")
-    parser.add_argument('output', nargs='?', default=sys.stdout,
-                        help="The path to the output html file")
     args = parser.parse_args()
 
     conn = sqlite3.connect(args.db)
@@ -55,21 +42,18 @@ def main():
     for bookmark_id, tag_id in curs:
         bookmarks_tags[bookmark_id].append(tag_id)
 
-    for bookmark_id, bookmark in bookmarks.iteritems():
+    for bookmark_id, bookmark in bookmarks.items():
         bookmark.tags = [tags[tid] for tid in bookmarks_tags[bookmark_id]]
 
-    template = Template(filename=os.path.join(here, 'delicious.mako'),
-                        imports=['from rescuedel.rescue import xmlescape'],
-                        output_encoding='utf-8',
-                       )
-
-    html = template.render(bookmarks=bookmarks.values())
-
-    output = open(args.output, 'w') if isinstance(args.output, basestring) \
-             else args.output
-
-    with output as f:
-        f.write(html)
+    api = DeliciousAPI(raw_input("username: "), getpass("password: "))
+    for bm in bookmarks.values():
+        print "Posting %s" % bm.name
+        api.posts_add(url=bm.url, description=bm.name,
+                      extended=bm.description, tags=','.join(bm.tags),
+                      dt=bm.add_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                      replace=True,
+                      shared=not bm.private)
+        time.sleep(1)
 
 
 if __name__ == '__main__':
