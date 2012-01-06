@@ -17,7 +17,7 @@ setup(name='RescueDelicious',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-          'Mako',
+          'pydelicious',
       ],
       entry_points="""
       [console_scripts]
